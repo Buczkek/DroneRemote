@@ -1,0 +1,128 @@
+
+# Watch this video for more information about that library https://www.youtube.com/watch?v=aP8rSN-1eT0
+import time
+import math
+
+import machine
+
+from nrf24l01 import NRF24L01
+from machine import SPI, Pin, I2C
+from time import sleep
+import struct
+
+# sleep(5)
+
+
+csn = Pin(14, mode=Pin.OUT, value=1)  # Chip Select Not
+ce = Pin(17, mode=Pin.OUT, value=0)  # Chip Enable
+led = Pin(25, Pin.OUT)  # Onboard LED
+payload_size = 20
+
+# Define the channel or 'pipes' the radios use.
+# switch round the pipes depending if this is a sender or receiver pico
+
+send_pipe = b"\xd2\xf0\xf0\xf0\xf0"
+receive_pipe = b"\xe1\xf0\xf0\xf0\xf0"
+
+
+def setup():
+    print("Initialising the nRF24L0+ Module")
+    nrf = NRF24L01(SPI(0), csn, ce, payload_size=payload_size)
+    nrf.open_tx_pipe(send_pipe)
+    nrf.open_rx_pipe(1, receive_pipe)
+    nrf.start_listening()
+    return nrf
+
+
+def flash_led(times: int = None):
+    ''' Flashed the built in LED the number of times defined in the times parameter '''
+    for _ in range(times):
+        led.value(1)
+        sleep(0.01)
+        led.value(0)
+        sleep(0.01)
+
+
+def send(nrf, msg):
+    msg += ';'
+
+    nrf.stop_listening()
+    for n in range(len(msg)):
+        try:
+            encoded_string = msg[n].encode()
+            byte_array = bytearray(encoded_string)
+            buf = struct.pack("s", byte_array)
+            nrf.send_start(buf)
+            # print("message",msg[n],"sent")
+            print("sent")
+            flash_led(1)
+        except OSError:
+            print("Sorry message not sent")
+    nrf.start_listening()
+#
+#
+# def send_all(nrf, buf):
+#     nrf.stop_listening()
+#     encoded_string = msg.encode()
+#     nrf.send_all(encoded_string)
+#     # flash_led(1)
+#     nrf.start_listening()
+
+
+# main code loop
+# flash_led(1)
+nrf = setup()
+nrf.start_listening()
+msg_string = ""
+
+i = 0
+last = time.time()
+
+from ST7735 import TFT
+from sysfont import sysfont
+
+spi = SPI(1, baudrate=20000000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=None)
+
+tft = TFT(spi, 12, 15, 13)
+
+tft.initr()
+
+tft.rgb(True)
+
+tft._offset = (2, 1)
+
+tft.fill(TFT.BLACK)
+
+tft.rotation(1)
+
+# print("wchodze")
+while True:
+    msg = ""
+    # Check for Messages
+    if nrf.any():
+        # print("elo")
+        package = nrf.recv()
+        message = struct.unpack("s", package)
+        msg = message[0].decode()
+        # flash_led(1)
+
+        print(repr(message[0]), len(message[0]), end='\n')
+        print(msg)
+
+        # Check for the new line character
+        if (msg == ";") and (len(msg_string) <= 50):
+            # print("full message", i, "\n\t", msg_string, msg)
+            print(msg_string, end='\r')
+
+            msgs2disp = msg_string.split("\t")
+            v = 40
+            for msg2disp in msgs2disp:
+                tft.text((5, v), msg2disp, TFT.WHITE, sysfont, 1)
+                v += 8
+            msg_string = ""
+            i += 1
+        else:
+            if len(msg_string) <= 50:
+                msg_string = msg_string + msg
+            else:
+                msg_string = ""
