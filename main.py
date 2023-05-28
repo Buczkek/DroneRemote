@@ -12,7 +12,18 @@ import struct
 
 # sleep(5)
 
+
+def map_value(x, in_min, in_max, out_min, out_max):
+    return (x - in_min) * (out_max - out_min) // (in_max - in_min) + out_min
+
+
+def clamp(n, minn, maxn):
+    return max(min(maxn, n), minn)
+
+
 pitch_pin = machine.ADC(27)
+yaw_pin = machine.ADC(28)
+throttle_pin = machine.ADC(26)
 
 csn = Pin(14, mode=Pin.OUT, value=1)  # Chip Select Not
 ce = Pin(17, mode=Pin.OUT, value=0)  # Chip Enable
@@ -163,4 +174,10 @@ print("zaczynam")
 #         # print(f"msg_string: {msg_string}")
 
 while True:
-    print(pitch_pin.read_u16())
+    pitch_val = pitch_pin.read_u16()
+    yaw_val = yaw_pin.read_u16()
+    throttle_val = throttle_pin.read_u16()
+    print(f"pitch: {clamp(map_value(pitch_val, 400, 65535, 11, -10), -10, 10)} raw: {pitch_val} " +
+          f"yaw: {clamp(map_value(yaw_val, 400, 65535, 11, -10), -10, 10)} raw: {yaw_val} " +
+          f"throttle: {clamp(map_value(throttle_val, 2300, 57100, 400, 0), 0, 400)} raw: {throttle_val}")
+    sleep(0.1)
