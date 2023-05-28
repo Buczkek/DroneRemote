@@ -12,11 +12,12 @@ import struct
 
 # sleep(5)
 
+pitch_pin = machine.ADC(27)
 
 csn = Pin(14, mode=Pin.OUT, value=1)  # Chip Select Not
 ce = Pin(17, mode=Pin.OUT, value=0)  # Chip Enable
 led = Pin(25, Pin.OUT)  # Onboard LED
-payload_size = 20
+payload_size = 32
 
 # Define the channel or 'pipes' the radios use.
 # switch round the pipes depending if this is a sender or receiver pico
@@ -43,21 +44,42 @@ def flash_led(times: int = None):
         sleep(0.01)
 
 
+# def send(nrf, msg):
+#     msg += ';'
+#
+#     nrf.stop_listening()
+#     for n in range(len(msg)):
+#         try:
+#             encoded_string = msg[n].encode()
+#             byte_array = bytearray(encoded_string)
+#             buf = struct.pack("s", byte_array)
+#             nrf.send_start(buf)
+#             # print("message",msg[n],"sent")
+#             print("sent")
+#             flash_led(1)
+#         except OSError:
+#             print("Sorry message not sent")
+#     nrf.start_listening()
+
 def send(nrf, msg):
     msg += ';'
 
     nrf.stop_listening()
-    for n in range(len(msg)):
-        try:
-            encoded_string = msg[n].encode()
-            byte_array = bytearray(encoded_string)
-            buf = struct.pack("s", byte_array)
-            nrf.send_start(buf)
-            # print("message",msg[n],"sent")
-            print("sent")
-            flash_led(1)
-        except OSError:
-            print("Sorry message not sent")
+    try:
+        encoded_string = msg.encode()
+        byte_array = bytearray(encoded_string)
+        buf = struct.pack("s", byte_array)
+        nrf.send_start(byte_array)
+        print(f"msg: {msg}")
+        print(f"encoded_string: {encoded_string}")
+        print(f"byte_array: {byte_array}")
+        print(f"buf: {buf}")
+        # print("message",msg[n],"sent")
+        # print("sent")
+        # flash_led(1)
+    except OSError:
+        print("Sorry message not sent")
+    print("message sent")
     nrf.start_listening()
 #
 #
@@ -76,53 +98,69 @@ nrf.start_listening()
 msg_string = ""
 
 i = 0
-last = time.time()
+last = time.ticks_ms()
+# delta_time = time.ticks_diff(current_time, last_time) / 1000
 
-from ST7735 import TFT
-from sysfont import sysfont
+# from ST7735 import TFT
+# from sysfont import sysfont
+#
+# spi = SPI(1, baudrate=20000000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=None)
+#
+# tft = TFT(spi, 12, 15, 13)
+#
+# tft.initr()
+#
+# tft.rgb(True)
+#
+# tft._offset = (2, 1)
+#
+# tft.fill(TFT.BLACK)
+#
+# tft.rotation(1)
+print("zaczynam")
+# while True:
+#     msg = ""
+#     # Check for Messages
+#     # print("waiting for message")
+#     if nrf.any():
+#         print("got something")
+#         package = nrf.recv()
+#         # print(f"package: {package}")
+#         # message = struct.unpack("s", package)
+#         message = package
+#         message = message.replace(b'\x00', b'')
+#         print(f"message: {message.decode()}")
+#         # msg = message.decode()
+#         # msg_string += msg
+#         # # flash_led(1)
+#         #
+#         # print(repr(message), len(message), end='\n')
+#         # print(msg)
+#
+#         # # Check for the new line character
+#         # if (msg[-1] == ";") and (len(msg_string) <= 50):
+#         #     # print("full message", i, "\n\t", msg_string, msg)
+#         #     print(msg_string, end='\r')
+#         #
+#         #     msgs2disp = msg_string.split("\t")
+#         #     v = 40
+#         #     for msg2disp in msgs2disp:
+#         #         # print(time.time() - last, time.time(), last)
+#         #         if (time.ticks_diff(time.ticks_ms(), last) / 1000) < .01:
+#         #             break
+#         #         # tft.fill(TFT.BLACK)
+#         #         tft.text((5, v), msg2disp, TFT.WHITE, sysfont, 1)
+#         #         v += 8
+#         #         last = time.ticks_ms()
+#         #     msg_string = ""
+#         #     i += 1
+#         # else:
+#         #     if len(msg_string) <= 50:
+#         #         msg_string = msg_string + msg
+#         #     else:
+#         #         msg_string = ""
+#
+#         # print(f"msg_string: {msg_string}")
 
-spi = SPI(1, baudrate=20000000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=None)
-
-tft = TFT(spi, 12, 15, 13)
-
-tft.initr()
-
-tft.rgb(True)
-
-tft._offset = (2, 1)
-
-tft.fill(TFT.BLACK)
-
-tft.rotation(1)
-
-# print("wchodze")
 while True:
-    msg = ""
-    # Check for Messages
-    if nrf.any():
-        # print("elo")
-        package = nrf.recv()
-        message = struct.unpack("s", package)
-        msg = message[0].decode()
-        # flash_led(1)
-
-        print(repr(message[0]), len(message[0]), end='\n')
-        print(msg)
-
-        # Check for the new line character
-        if (msg == ";") and (len(msg_string) <= 50):
-            # print("full message", i, "\n\t", msg_string, msg)
-            print(msg_string, end='\r')
-
-            msgs2disp = msg_string.split("\t")
-            v = 40
-            for msg2disp in msgs2disp:
-                tft.text((5, v), msg2disp, TFT.WHITE, sysfont, 1)
-                v += 8
-            msg_string = ""
-            i += 1
-        else:
-            if len(msg_string) <= 50:
-                msg_string = msg_string + msg
-            else:
-                msg_string = ""
+    print(pitch_pin.read_u16())
