@@ -2,12 +2,12 @@
 # Watch this video for more information about that library https://www.youtube.com/watch?v=aP8rSN-1eT0
 import time
 import math
+import urandom
 
 import machine
 
 from nrf24l01 import NRF24L01
-from machine import SPI, Pin, I2C
-from time import sleep
+from machine import SPI, Pin
 import struct
 
 # sleep(5)
@@ -46,32 +46,6 @@ def setup():
     return nrf
 
 
-def flash_led(times: int = None):
-    ''' Flashed the built in LED the number of times defined in the times parameter '''
-    for _ in range(times):
-        led.value(1)
-        sleep(0.01)
-        led.value(0)
-        sleep(0.01)
-
-
-# def send(nrf, msg):
-#     msg += ';'
-#
-#     nrf.stop_listening()
-#     for n in range(len(msg)):
-#         try:
-#             encoded_string = msg[n].encode()
-#             byte_array = bytearray(encoded_string)
-#             buf = struct.pack("s", byte_array)
-#             nrf.send_start(buf)
-#             # print("message",msg[n],"sent")
-#             print("sent")
-#             flash_led(1)
-#         except OSError:
-#             print("Sorry message not sent")
-#     nrf.start_listening()
-
 def send(nrf, msg):
     msg += ';'
 
@@ -81,103 +55,70 @@ def send(nrf, msg):
         byte_array = bytearray(encoded_string)
         buf = struct.pack("s", byte_array)
         nrf.send_start(byte_array)
-        print(f"msg: {msg}")
-        print(f"encoded_string: {encoded_string}")
-        print(f"byte_array: {byte_array}")
-        print(f"buf: {buf}")
-        # print("message",msg[n],"sent")
-        # print("sent")
-        # flash_led(1)
     except OSError:
         print("Sorry message not sent")
-    print("message sent")
     nrf.start_listening()
-#
-#
-# def send_all(nrf, buf):
-#     nrf.stop_listening()
-#     encoded_string = msg.encode()
-#     nrf.send_all(encoded_string)
-#     # flash_led(1)
-#     nrf.start_listening()
-
-
-# main code loop
-# flash_led(1)
 nrf = setup()
 nrf.start_listening()
 msg_string = ""
 
 i = 0
 last = time.ticks_ms()
-# delta_time = time.ticks_diff(current_time, last_time) / 1000
 
-# from ST7735 import TFT
-# from sysfont import sysfont
-#
-# spi = SPI(1, baudrate=20000000, polarity=0, phase=0, sck=Pin(10), mosi=Pin(11), miso=None)
-#
-# tft = TFT(spi, 12, 15, 13)
-#
-# tft.initr()
-#
-# tft.rgb(True)
-#
-# tft._offset = (2, 1)
-#
-# tft.fill(TFT.BLACK)
-#
-# tft.rotation(1)
-print("zaczynam")
-# while True:
-#     msg = ""
-#     # Check for Messages
-#     # print("waiting for message")
-#     if nrf.any():
-#         print("got something")
-#         package = nrf.recv()
-#         # print(f"package: {package}")
-#         # message = struct.unpack("s", package)
-#         message = package
-#         message = message.replace(b'\x00', b'')
-#         print(f"message: {message.decode()}")
-#         # msg = message.decode()
-#         # msg_string += msg
-#         # # flash_led(1)
-#         #
-#         # print(repr(message), len(message), end='\n')
-#         # print(msg)
-#
-#         # # Check for the new line character
-#         # if (msg[-1] == ";") and (len(msg_string) <= 50):
-#         #     # print("full message", i, "\n\t", msg_string, msg)
-#         #     print(msg_string, end='\r')
-#         #
-#         #     msgs2disp = msg_string.split("\t")
-#         #     v = 40
-#         #     for msg2disp in msgs2disp:
-#         #         # print(time.time() - last, time.time(), last)
-#         #         if (time.ticks_diff(time.ticks_ms(), last) / 1000) < .01:
-#         #             break
-#         #         # tft.fill(TFT.BLACK)
-#         #         tft.text((5, v), msg2disp, TFT.WHITE, sysfont, 1)
-#         #         v += 8
-#         #         last = time.ticks_ms()
-#         #     msg_string = ""
-#         #     i += 1
-#         # else:
-#         #     if len(msg_string) <= 50:
-#         #         msg_string = msg_string + msg
-#         #     else:
-#         #         msg_string = ""
-#
-#         # print(f"msg_string: {msg_string}")
 
+def gen_unique_id(bytes_num: int = 4):
+    """ Generates a unique ID of the specified byte length using urandom.getrandbits() """
+    if bytes_num <= 4:
+        return urandom.getrandbits(bytes_num * 8)
+    else:
+        result = bytearray()
+        while bytes_num > 4:
+            result += int.to_bytes(urandom.getrandbits(32), 4, 'big')
+            bytes_num -= 4
+        result += int.to_bytes(urandom.getrandbits(bytes_num * 8), bytes_num, 'big')
+        return result
+
+
+def gen_frame_for_angles(pitch: int, yaw: int, throttle: int, *, frame_length: int = 32):
+    frame = bytearray()
+    frame += b'\x00'
+    frame += b'\xf0'
+    frame += gen_unique_id(10)
+    payload = bytearray(14) + pitch.to_bytes(2, 'big') + yaw.to_bytes(2, 'big') + throttle.to_bytes(2, 'big')
+    frame += payload
+    return frame
+
+
+last = time.ticks_ms()
+times = 0
+led.value(1)
 while True:
     pitch_val = pitch_pin.read_u16()
     yaw_val = yaw_pin.read_u16()
     throttle_val = throttle_pin.read_u16()
-    print(f"pitch: {clamp(map_value(pitch_val, 400, 65535, 11, -10), -10, 10)} raw: {pitch_val} " +
-          f"yaw: {clamp(map_value(yaw_val, 400, 65535, 11, -10), -10, 10)} raw: {yaw_val} " +
-          f"throttle: {clamp(map_value(throttle_val, 2300, 57100, 400, 0), 0, 400)} raw: {throttle_val}")
-    sleep(0.1)
+    pitch_final = clamp(map_value(pitch_val, 400, 65535, 11, -10), -10, 10)
+    yaw_final = clamp(map_value(yaw_val, 400, 65535, 11, -10), -10, 10)
+    throttle_final = clamp(map_value(throttle_val, 2300, 57100, 400, 0), 0, 400)
+
+    # print(f"pitch: {pitch_final} raw: {pitch_val} " +
+    #       f"yaw: {yaw_final} raw: {yaw_val} " +
+    #       f"throttle: {throttle_final} raw: {throttle_val}")
+    package = gen_frame_for_angles(pitch_final+50, yaw_final+50, throttle_final)
+    # print(package)
+
+    times += 1
+    now = time.ticks_ms()
+
+    nrf.flush_rx()
+    nrf.flush_tx()
+    nrf.send_start(package)
+
+    if time.ticks_diff(now, last) > 1000:
+        print(f"times: {times}")
+        times = 0
+        last = now
+
+    # if nrf.any():
+    #     package = nrf.recv()
+    #     print(f"package: {package}")
+    # sleep(0.1)
